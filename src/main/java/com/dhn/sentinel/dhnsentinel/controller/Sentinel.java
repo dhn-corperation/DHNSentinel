@@ -17,6 +17,7 @@ public class Sentinel {
     @Autowired
     private LocalStartService localStartService;
 
+    /*
     @Scheduled(cron = "0/30 * * * * * ")
     private void sentinel() {
 
@@ -58,5 +59,11 @@ public class Sentinel {
 
         }
 
+    }
+     */
+
+    @Scheduled(cron = "0/10 * * * * * ")
+    private void Test() {
+        localStartService.test();
     }
 }

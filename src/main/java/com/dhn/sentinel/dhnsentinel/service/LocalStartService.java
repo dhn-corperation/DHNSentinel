@@ -1,6 +1,7 @@
 package com.dhn.sentinel.dhnsentinel.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +29,9 @@ public class LocalStartService {
     private String cPort;
     @Value("${dhnserver.port}")
     private String sPort;
+
+    @Autowired
+    private SendAlimtalk sendAlimtalk;
 
     // 로컬 명령어 실행 메서드
     public void executeLocalCommand(String command) {
@@ -77,5 +81,9 @@ public class LocalStartService {
     public void startLGAgent(String service) {
         String command = "/root/"+service+"/bin/uagent.sh start";
         executeLocalCommand(command);
+    }
+
+    public void test() {
+        sendAlimtalk.test();
     }
 }
