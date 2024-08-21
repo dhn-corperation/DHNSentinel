@@ -17,53 +17,55 @@ public class Sentinel {
     @Autowired
     private LocalStartService localStartService;
 
-    /*
+    private boolean isStart = true;
+
     @Scheduled(cron = "0/30 * * * * * ")
     private void sentinel() {
 
-        // 서버 접근 체크 (살아있는지)
-        boolean status = sentinelService.Accsess();
+        if(isStart){
+            // 서버 접근 체크 (살아있는지)
+            boolean status = sentinelService.Accsess();
 
-        if(status){
-            // DB 체크
-            sentinelService.DatabaseCheck();
+            if(status){
+                // DB 체크
+                boolean dbcheck = sentinelService.DatabaseCheck();
+                if(!dbcheck){
+                    isStart = false;
+                    return;
+                }
 
-            // DHN 체크
-            sentinelService.DHNAgentCheck("DHNCenter");
-            sentinelService.DHNAgentCheck("DHNServer");
+                // DHN 체크
+                boolean dhncenter = sentinelService.DHNAgentCheck("DHNCenter");
+                if(!dhncenter){
+                    isStart = false;
+                    return;
+                }
+                boolean dhnserver = sentinelService.DHNAgentCheck("DHNServer");
+                if(!dhnserver){
+                    isStart = false;
+                    return;
+                }
 
-            // NANO 체크
-            sentinelService.NanoAgentCheck("nanoagent");
+                // NANO 체크
+                boolean nano = sentinelService.NanoAgentCheck("nanoagent");
+                if(!nano){
+                    isStart = false;
+                    return;
+                }
 
-            //LG 체크
-            sentinelService.lgAgentCheck("lguplus");
+                //LG 체크
+                boolean lg = sentinelService.lgAgentCheck("lguplus");
+                if(!lg){
+                    isStart = false;
+                    return;
+                }
 
-        }else{
-            // 로컬 DB 실행
-            localStartService.startDatabase();
-
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException e) {
-                log.error(e.getMessage());
+            }else{
+                // 로컬 실행
+                localStartService.allStart();
+                isStart = false;
             }
-
-            // 로컬 NANO 실행
-            localStartService.startNanoAgent("nanoagent");
-            // 로컬 LG 실행
-            localStartService.startLGAgent("lguplus");
-
-            // 로컬 DHN 실행
-            localStartService.startDHNCenter();
-            localStartService.startDHNServer();
-
         }
-
     }
-     */
 
-    @Scheduled(cron = "0/10 * * * * * ")
-    private void Test() {
-        localStartService.test();
-    }
 }

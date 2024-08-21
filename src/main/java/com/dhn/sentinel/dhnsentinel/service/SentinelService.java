@@ -4,6 +4,7 @@ import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.client.*;
@@ -41,6 +42,14 @@ public class SentinelService {
     private String cPort;
     @Value("${dhnserver.port}")
     private String sPort;
+    @Value("${dhn.company}")
+    private String company;
+    @Value("${dhn.server}")
+    private String server;
+
+
+    @Autowired
+    private SendAlimtalk sendAlimtalk;
 
     public boolean Accsess(){
         try {
@@ -49,6 +58,7 @@ public class SentinelService {
                 log.info("서버는 정상적으로 연결되었습니다.");
             } else {
                 log.info("서버에 연결할 수 없습니다.");
+                return false;
             }
         } catch (Exception e) {
             log.error("Exception: " + e.getMessage(), e);
@@ -58,7 +68,7 @@ public class SentinelService {
     }
 
     // DB 체크
-    public void DatabaseCheck(){
+    public boolean DatabaseCheck(){
         String url = "jdbc:mariadb://" + host + ":" + dbport + "?connectTimeout=5000";
         try(Connection connection = DriverManager.getConnection(url,dbuser,dbpw)){
             if (connection != null && !connection.isClosed()) {
@@ -66,8 +76,12 @@ public class SentinelService {
             }
         }catch (Exception e){
             log.info("데이터베이스에 연결할 수 없습니다. 재가동을 시작합니다.");
-            DatabaseStart();
+            boolean dbstatus = DatabaseStart();
+            if(!dbstatus){
+                return false;
+            }
         }
+        return true;
     }
 
     private Session sessionConnect() throws Exception{
@@ -81,7 +95,7 @@ public class SentinelService {
     }
 
     // DB 실행 명령어 및 세션 커넥트
-    private void DatabaseStart(){
+    private boolean DatabaseStart(){
         try{
             Session session = sessionConnect();
             String command = "/etc/init.d/mysqld start";
@@ -91,15 +105,21 @@ public class SentinelService {
             try(Connection connection = DriverManager.getConnection(url,dbuser,dbpw)){
                 if (connection != null && !connection.isClosed()) {
                     log.info("Database 정상 실행 되었습니다.");
+                    sendAlimtalk.send(company ,server+"DB", "DB", "재실행");
                 }
             }catch (Exception e){
                 log.error("데이터베이스 실행 실패하였습니다.", e);
+                sendAlimtalk.send(company ,server+"DB", "DB", "재실행 실패");
+                return false;
             }
 
             session.disconnect();
         }catch (Exception e){
             log.error("명령어 실행 중 예외가 발생했습니다.", e);
+            sendAlimtalk.send(company ,server+"DB", "DB실행 명령어", "실패");
+            return false;
         }
+        return true;
     }
 
     // DB 실행 로직
@@ -114,7 +134,7 @@ public class SentinelService {
     }
 
     // Center, Server 체크
-    public void DHNAgentCheck(String service){
+    public boolean DHNAgentCheck(String service){
 
         String port = service.equals("DHNCenter")?cPort:sPort;
 
@@ -139,20 +159,28 @@ public class SentinelService {
                 response = rt.exchange("http://"+host+":"+port, HttpMethod.GET,entity,String.class);
                 if(response.getStatusCode() == HttpStatus.OK){
                     log.info(service+" 재가동 완료 되었습니다.");
+                    sendAlimtalk.send(company ,server+"서버 "+service, service, "재가동");
                 }else{
                     log.info(service+" 재가동 실패하였습니다. 확인바랍니다.");
+                    sendAlimtalk.send(company ,server+"서버 "+service, service, "재가동 실패");
+                    return false;
                 }
             }
 
         }catch (HttpClientErrorException e) {
             log.error("HTTP 통신 오류 : " + e.getStatusCode() + ", " + e.toString());
+            sendAlimtalk.send(company ,server+"서버 "+service, service, "HTTP 통신 실패");
+            return false;
         }catch (Exception e){
             log.error("기타 오류 : " + e.toString());
+            sendAlimtalk.send(company ,server+"서버 "+service, service, "기타오류로 확인실패");
+            return false;
         }
+        return true;
     }
 
     // Nano 체크
-    public void NanoAgentCheck(String service){
+    public boolean NanoAgentCheck(String service){
         try {
             Session session = sessionConnect();
 
@@ -170,8 +198,11 @@ public class SentinelService {
 
                 if(!reRunning){
                     log.info("{} 에이전트 재가동 실패 확인 바랍니다.",service);
+                    sendAlimtalk.send(company ,server+"서버 "+service, service, "재가동 실패");
+                    return false;
                 }else{
                     log.info("{} 에이전트 재가동 되었습니다.",service);
+                    sendAlimtalk.send(company ,server+"서버 "+service, service, "재가동");
                 }
             }else{
                 log.info("{} 에이전트가 정상 작동 중입니다.",service);
@@ -180,7 +211,10 @@ public class SentinelService {
             session.disconnect();
         }catch (Exception e){
             log.error("NANO 체크중 오류 발생 : " + e.getMessage(), e);
+            sendAlimtalk.send(company ,server+"서버 "+service, service, "확인 실패");
+            return false;
         }
+        return true;
     }
 
     // 나노 상태 체크
@@ -207,7 +241,7 @@ public class SentinelService {
     }
 
     // lg 체크
-    public void lgAgentCheck(String service){
+    public boolean lgAgentCheck(String service){
         try {
             Session session = sessionConnect();
 
@@ -221,8 +255,11 @@ public class SentinelService {
 
                 if(!reRunning){
                     log.info("{} 에이전트 재가동 실패 확인 바랍니다.",service);
+                    sendAlimtalk.send(company ,server+"서버 "+service, service, "재가동 실패");
+                    return false;
                 }else{
                     log.info("{} 에이전트 재가동 되었습니다.",service);
+                    sendAlimtalk.send(company ,server+"서버 "+service, service, "재가동");
                 }
             }else{
                 log.info("{} 에이전트가 정상 작동 중입니다.",service);
@@ -231,7 +268,10 @@ public class SentinelService {
             session.disconnect();
         }catch (Exception e){
             log.error("LG 체크중 오류 발생 : " + e.getMessage(), e);
+            sendAlimtalk.send(company ,server+"서버 "+service, service, "확인 실패");
+            return false;
         }
+        return true;
     }
 
     // LG 상태 체크

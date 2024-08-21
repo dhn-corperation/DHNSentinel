@@ -9,32 +9,18 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class LocalStartService {
 
-    @Value("${dhn.username}")
-    private String username;
-    @Value("${dhn.host}")
-    private String host;
-    @Value("${dhn.port}")
-    private int port;
-    @Value("${dhn.password}")
-    private String password;
-
-    @Value("${database.user}")
-    private String dbuser;
-    @Value("${database.password}")
-    private String dbpw;
-    @Value("${database.port}")
-    private String dbport;
-
-    @Value("${dhncenter.port}")
-    private String cPort;
-    @Value("${dhnserver.port}")
-    private String sPort;
+    @Value("${dhn.company}")
+    private String company;
+    @Value("${dhn.server}")
+    private String server;
+    @Value("${dhn.localserver}")
+    private String localserver;
 
     @Autowired
     private SendAlimtalk sendAlimtalk;
 
     // 로컬 명령어 실행 메서드
-    public void executeLocalCommand(String command) {
+    public boolean executeLocalCommand(String command, String issue) {
         try {
             ProcessBuilder processBuilder = new ProcessBuilder();
             processBuilder.command("bash", "-c", command);
@@ -46,44 +32,93 @@ public class LocalStartService {
                 log.info("명령어 실행 성공: " + command);
             } else {
                 log.error("명령어 실행 실패. 종료 코드: " + exitCode);
+                sendAlimtalk.send(company ,localserver, issue, "실행 명령 실패");
+                return false;
             }
 
         } catch (Exception e) {
             log.error("로컬 명령어 실행 중 오류 발생: " + e.getMessage(), e);
+            sendAlimtalk.send(company ,localserver, issue, "실행 중 오류발생");
+            return false;
         }
+        return true;
+    }
+
+    public void allStart(){
+        // 로컬 DB 실행
+        startDatabase();
+        boolean db = true;
+        boolean nano = true;
+        boolean lg = true;
+        boolean dhnCenter = true;
+        boolean dhnServer = true;
+        try {
+            // 로컬 DB 실행
+            db = startDatabase();
+            if(!db){
+                return;
+            }
+            Thread.sleep(5000);
+
+            // 로컬 NANO 실행
+            nano = startNanoAgent("nanoagent");
+            if(!nano){
+                return;
+            }
+            Thread.sleep(1000);
+            // 로컬 LG 실행
+            lg = startLGAgent("lguplus");
+            if(!lg){
+                return;
+            }
+            Thread.sleep(1000);
+
+            // 로컬 DHN 실행
+            dhnCenter = startDHNCenter();
+            if(!dhnCenter){
+                return;
+            }
+            dhnServer = startDHNServer();
+            if(!dhnServer){
+                return;
+            }
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            log.error(e.getMessage());
+        }
+
+        sendAlimtalk.send(company,server,localserver+"서버","실행");
+
     }
 
     // 로컬에서 DB 실행
-    public void startDatabase() {
+    public boolean startDatabase() {
         String command = "/etc/init.d/mysqld start";
-        executeLocalCommand(command);
+        return executeLocalCommand(command,"DB");
     }
 
     // 로컬에서 DHNCenter 실행
-    public void startDHNCenter() {
+    public boolean startDHNCenter() {
         String command = "systemctl start DHNCenter";
-        executeLocalCommand(command);
+        return executeLocalCommand(command,"DHNCenter");
     }
 
     // 로컬에서 DHNServer 실행
-    public void startDHNServer() {
+    public boolean startDHNServer() {
         String command = "systemctl start DHNServer";
-        executeLocalCommand(command);
+        return executeLocalCommand(command,"DHNServer");
     }
 
     // 로컬에서 NanoAgent 실행
-    public void startNanoAgent(String service) {
+    public boolean startNanoAgent(String service) {
         String command = "/root/"+service+"/manager-linux.sh start";
-        executeLocalCommand(command);
+        return executeLocalCommand(command,"NANOAgent");
     }
 
     // 로컬에서 LGU+ 에이전트 실행
-    public void startLGAgent(String service) {
+    public boolean startLGAgent(String service) {
         String command = "/root/"+service+"/bin/uagent.sh start";
-        executeLocalCommand(command);
+        return executeLocalCommand(command,"LGAgent");
     }
 
-    public void test() {
-        sendAlimtalk.test();
-    }
 }
