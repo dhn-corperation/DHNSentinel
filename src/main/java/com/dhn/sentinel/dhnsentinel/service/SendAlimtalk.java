@@ -56,8 +56,6 @@ public class SendAlimtalk {
         }
 
 
-        log.info(list.toString());
-
         List<String> apiList = new ArrayList<String>();
         ObjectMapper mp = new ObjectMapper();
 
@@ -77,8 +75,6 @@ public class SendAlimtalk {
 
         for (String api : apiList) {
             HttpEntity<String> entity = new HttpEntity<String>(api.toString(),header);
-
-            log.info(entity.toString());
 
             try{
                 ResponseEntity<String> response = rst.postForEntity(aturl,entity,String.class);
