@@ -55,9 +55,10 @@ public class SendAlimtalk {
             list.add(alimtalkVO);
         }
 
+
         log.info(list.toString());
 
-        List<String> apiList = new ArrayList<>();
+        List<String> apiList = new ArrayList<String>();
         ObjectMapper mp = new ObjectMapper();
 
         try{
@@ -67,20 +68,20 @@ public class SendAlimtalk {
         }catch (JsonProcessingException e){
             log.error(e.getMessage());
         }
-        log.info(apiList.toString());
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Authorization", key);
+        HttpHeaders header = new HttpHeaders();
+        header.setContentType(MediaType.APPLICATION_JSON);
+        header.set("Authorization", key);
 
         RestTemplate rst = new RestTemplate();
 
         for (String api : apiList) {
-            HttpEntity<String> entity = new HttpEntity<>(api.toString(),headers);
-            ResponseEntity<String> response = null;
+            HttpEntity<String> entity = new HttpEntity<String>(api.toString(),header);
+
+            log.info(entity.toString());
 
             try{
-                response = rst.postForEntity(aturl,entity,String.class);
+                ResponseEntity<String> response = rst.postForEntity(aturl,entity,String.class);
                 log.info(response.getStatusCode() + " / " + response.getBody());
 
                 if(response.getStatusCode() == HttpStatus.OK){
@@ -94,7 +95,5 @@ public class SendAlimtalk {
                 log.error("API 전송 오류 : "+e.getMessage());
             }
         }
-
-
     }
 }
